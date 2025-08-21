@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // IMPORTANT: Replace this with your actual computer's IP address!
 // Example: If your IP is 192.168.1.105, change the line below to:
 // const COMPUTER_IP = '192.168.1.105';
-const COMPUTER_IP = '192.168.0.80'; // ← Your actual IP address!
+const COMPUTER_IP = '192.168.0.38'; // ← Your actual IP address!
 
 // API Configuration
 const API_BASE_URL = __DEV__ 
@@ -36,6 +36,8 @@ class ApiService {
   }
 
   // Generic request method with error handling
+  // ...existing code...
+
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
@@ -46,7 +48,6 @@ class ApiService {
       ...options,
     };
 
-    // Add auth token if available
     if (this.token) {
       config.headers.Authorization = `Bearer ${this.token}`;
     }
@@ -54,7 +55,17 @@ class ApiService {
     try {
       console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
       
-      const response = await fetch(url, config);
+      // Add timeout handling
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(url, {
+        ...config,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      
       const data = await response.json();
 
       if (!response.ok) {
@@ -64,6 +75,10 @@ class ApiService {
       console.log(`✅ API Success: ${endpoint}`, data);
       return data;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error(`❌ Request timeout: ${url}`);
+        throw new Error(`Connection timed out. Please check if your backend server is running at ${COMPUTER_IP}:5000`);
+      }
       console.error(`❌ API Error: ${endpoint}`, error);
       throw error;
     }
@@ -347,6 +362,7 @@ class ApiService {
     }
   }
 }
+
 
 // Export singleton instance
 export default new ApiService();
